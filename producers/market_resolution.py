@@ -63,11 +63,18 @@ def get_market_by_slug(slug):
 def build_resolution_message(market):
     outcome_prices = json.loads(market.get('outcomePrices', '["0","0"]'))
     
-    if outcome_prices[1] == 1: 
-        resolution = 'Down'
-    else:
-        resolution = 'Up'
+    # Convert strings to floats for comparison
+    yes_price = float(outcome_prices[0])
+    no_price = float(outcome_prices[1])
     
+    # Winner is the one with price = 1.0
+    if no_price == 1.0: 
+        resolution = 'Down'
+    elif yes_price == 1.0:
+        resolution = 'Up'
+    else:
+        resolution = 'Unknown'
+
     return {
         'market_id': market['id'],
         'market_slug': market['slug'],
