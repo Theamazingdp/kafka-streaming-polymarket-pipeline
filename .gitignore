@@ -3,4 +3,4 @@
 "*.pyc" 
 ".env" 
 "*.log" 
-"pk.txt"
+"producers/pk.txt"
