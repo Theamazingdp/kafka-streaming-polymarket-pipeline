@@ -31,38 +31,55 @@ def on_message(ws, message):
     
     try:
         data = json.loads(message)
-        event_type = data.get('event_type')
 
-        # BOOK TYPE
-        if event_type == 'book':
-            bids = data.get('bids', [])
-            asks = data.get('asks', [])
+        # Handle if data is a list (batch of messages)
+        if isinstance(data, list):
+            for item in data:
+                process_event(item)
+        else:
+            process_event(data)
+    
+    except Exception as e:
+        print(f"Error processing message: {e}")
+        
+
+def process_event(data):
+    if not isinstance(data, dict):
+        return  # Ignore non-dict messages
+    
+    event_type = data.get('event_type')
+
+    # BOOK TYPE
+    if event_type == 'book':
+        bids = data.get('bids', [])
+        asks = data.get('asks', [])
+        
+
+        if bids and asks:
             outcome = token_outcome_map[data['asset_id']]
+            # Extract best bid and ask
+            best_bid_price = float(bids[0]['price'])
+            best_bid_size = float(bids[0]['size'])
+            best_ask_price = float(asks[0]['price'])
+            best_ask_size = float(asks[0]['size'])
 
-            if bids and asks:
-                # Extract best bid and ask
-                best_bid_price = float(bids[0]['price'])
-                best_bid_size = float(bids[0]['size'])
-                best_ask_price = float(asks[0]['price'])
-                best_ask_size = float(asks[0]['size'])
+            # Calc total volumes
+            total_bid_volume = sum(float(bid['size']) for bid in bids)
+            total_ask_volume = sum(float(ask['size']) for ask in asks)
 
-                # Calc total volumes
-                total_bid_volume = sum(float(bid['size']) for bid in bids)
-                total_ask_volume = sum(float(ask['size']) for ask in asks)
+            # Find largest bid with its price
+            largest_bid_order = max(bids, key=lambda b: float(b['size']))
+            largest_bid_size = float(largest_bid_order['size'])
+            largest_bid_price = float(largest_bid_order['price'])
 
-                # Find largest bid with its price
-                largest_bid_order = max(bids, key=lambda b: float(b['size']))
-                largest_bid_size = float(largest_bid_order['size'])
-                largest_bid_price = float(largest_bid_order['price'])
+            # Find largest ask with its price
+            largest_ask_order = max(asks, key=lambda a: float(a['size']))
+            largest_ask_size = float(largest_ask_order['size'])
+            largest_ask_price = float(largest_ask_order['price'])
 
-                # Find largest ask with its price
-                largest_ask_order = max(asks, key=lambda a: float(a['size']))
-                largest_ask_size = float(largest_ask_order['size'])
-                largest_ask_price = float(largest_ask_order['price'])
-
-                # Book imbalance
-                total_volume = total_bid_volume + total_ask_volume
-                book_imbalance = (total_bid_volume - total_ask_volume) / total_volume if total_volume > 0 else 0
+            # Book imbalance
+            total_volume = total_bid_volume + total_ask_volume
+            book_imbalance = (total_bid_volume - total_ask_volume) / total_volume if total_volume > 0 else 0
 
             event = {
                 'type' : 'orderbook_summary',
@@ -86,40 +103,41 @@ def on_message(ws, message):
 
             producer.send('polymarket-prices', event)
 
-        # PRICE CHANGE TYPE
-        elif event_type == 'price_change':
-            for change in data['price_changes']:
-                # only capture buy side
-                if change['side'] == 'BUY':
-                    event = {
-                        'type': 'price_change',
-                        'market_id': current_market_id,
-                        'asset_id': change['asset_id'],
-                        'outcome': token_outcome_map[change['asset_id']],
-                        'timestamp': datetime.now().isoformat(),
-                        'price': float(change['price']),
-                        'size': float(change['size']),
-                    }
-                    producer.send('polymarket-prices', event)
+    # PRICE CHANGE TYPE
+    elif event_type == 'price_change':
+        for change in data['price_changes']:
+            # only capture buy side
+            if change['side'] == 'BUY':
+                event = {
+                    'type': 'price_change',
+                    'market_id': current_market_id,
+                    'asset_id': change['asset_id'],
+                    'outcome': token_outcome_map[change['asset_id']],
+                    'side': change['side'],
+                    'timestamp': datetime.now().isoformat(),
+                    'price': float(change['price']),
+                    'size': float(change['size']),
+                }
+                producer.send('polymarket-prices', event)
 
-        # TRADE TYPE
-        elif event_type == 'last_trade_price':
-            event = {
-                'type': 'trade',
-                'market_id': current_market_id,
-                'asset_id': data['asset_id'],
-                'price': float(data['price']),
-                'side': data['side'],
-                'size': float(data['size']),
-                'timestamp': datetime.now().isoformat()
-            }
-            producer.send('polymarket-prices', event)
+    # TRADE TYPE
+    elif event_type == 'last_trade_price':
+        event = {
+            'type': 'trade',
+            'market_id': current_market_id,
+            'asset_id': data['asset_id'],
+            'price': float(data['price']),
+            'outcome': token_outcome_map[data['asset_id']],
+            'side': data['side'],
+            'size': float(data['size']),
+            'timestamp': datetime.now().isoformat()
+        }
+        producer.send('polymarket-prices', event)
 
-    except Exception as e:
-        print(f"Error processing message: {e}")
 
 def parse_datetime(dt_str):
     return datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+
 
 def on_open(ws):
     # Called when the WebSocket connection is opened

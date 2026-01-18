@@ -90,6 +90,9 @@ def parse_market_data(market):
     
     # Get token IDs for WebSocket subscription
     token_ids = market.get('clobTokenIds', [])
+
+    if isinstance(token_ids, str):
+        token_ids = json.loads(token_ids)
     
     return {
         'market_id': market.get('id'),
