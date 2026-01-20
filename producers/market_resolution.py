@@ -26,12 +26,16 @@ def resolve_market_when_ready(market_data):
     time.sleep(max(0, wait_seconds))
 
     # poll with retries
-    for attempt in range(5):
+    sleep_time = 30  # seconds
+    max_sleep = 300  # max 5 minutes
+
+    for attempt in range(20):
         market = get_market_by_slug(slug)
 
         if market is None:
-            print(f"Failed to fetch market {slug}, retrying in 30 seconds...")
-            time.sleep(30)
+            print(f"Failed to fetch market {slug}, retrying in {sleep_time} seconds...")
+            time.sleep(sleep_time)
+            sleep_time = min(sleep_time * 2, max_sleep)  # exponential backoff up to 5 minutes
             continue
 
         if market['closed'] and market.get('umaResolutionStatus') == 'resolved':
@@ -40,10 +44,20 @@ def resolve_market_when_ready(market_data):
             print(f"Published resolution for market {slug}")
             return
         else:
-            print(f"Market {slug} not resolved yet, retrying in 30 seconds...")
-            time.sleep(30)
+            print(f"Market {slug} not resolved yet, retrying in {sleep_time} seconds...")
+            time.sleep(sleep_time)
+            sleep_time = min(sleep_time * 2, max_sleep)  # exponential backoff up to 5 minutes
 
+    # Max retries exceeded
     print(f"Failed to resolve market {slug} after multiple attempts.")
+    failure_msg = {
+        'slug': slug,
+        'reason': 'Max retries exceeded (20 attempts over ~87 minutes)',
+        'failed_at': datetime.now(timezone.utc).isoformat(),
+        'last_known_status': market.get('umaResolutionStatus') if market else 'unknown'
+    }
+    producer.send('market-resolution-failures', failure_msg)
+    print(f"Published failure message for market {slug}")
 
 def parse_iso_datetime(dt_str):
     return datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
