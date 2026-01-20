@@ -6,8 +6,6 @@ services:
     networks:
       - trading-bot_default
     restart: unless-stopped
-    depends_on:
-      - kafka
     environment:
       - PYTHONUNBUFFERED=1
 
@@ -18,8 +16,6 @@ services:
     networks:
       - trading-bot_default
     restart: unless-stopped
-    depends_on:
-      - kafka
     environment:
       - PYTHONUNBUFFERED=1
 
@@ -30,8 +26,6 @@ services:
     networks:
       - trading-bot_default
     restart: unless-stopped
-    depends_on:
-      - kafka
     environment:
       - PYTHONUNBUFFERED=1
 
@@ -42,8 +36,6 @@ services:
     networks:
       - trading-bot_default
     restart: unless-stopped
-    depends_on:
-      - kafka
     environment:
       - PYTHONUNBUFFERED=1
 
@@ -54,9 +46,6 @@ services:
     networks:
       - trading-bot_default
     restart: unless-stopped
-    depends_on:
-      - kafka
-      - postgres
     environment:
       - PYTHONUNBUFFERED=1
 
