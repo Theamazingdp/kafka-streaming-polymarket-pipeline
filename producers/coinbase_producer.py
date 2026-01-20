@@ -42,14 +42,14 @@ class CoinbaseProducer:
                     self.message_count += 1
 
                     #print all messages now that its throttled
-                    print(f"📊 Message #{self.message_count}: BTC ${self.latest_price['price']:,.2f}")
+                    print(f"Message #{self.message_count}: BTC ${self.latest_price['price']:,.2f}")
                 
         except Exception as e:
             print(f"Error: {e}")
     
     def on_open(self, ws):
         """Called when WebSocket connects"""
-        print("🔌 Connected to Coinbase WebSocket!")
+        print("Connected to Coinbase WebSocket!")
         
         # Subscribe to BTC-USD ticker
         subscribe_message = {
@@ -65,21 +65,49 @@ class CoinbaseProducer:
     
     def on_close(self, ws, close_status_code, close_msg):
         print(f"WebSocket closed: {close_status_code}")
+        if self.should_reconnect:
+            print("Will attempt to reconnect...")
     
     def start(self):
         """Start the producer"""
         print("Starting Coinbase Producer...")
+
+        retry_delay = 5  # seconds
+        max_delay = 60 # max 1 min between retries
+
+        while self.should_reconnect:
+            try:
+                print("Connecting to Coinbase WebSocket...")
         
-        ws = websocket.WebSocketApp(
-            "wss://ws-feed.exchange.coinbase.com",
-            on_message=self.on_message,
-            on_open=self.on_open,
-            on_error=self.on_error,
-            on_close=self.on_close
-        )
+                ws = websocket.WebSocketApp(
+                    "wss://ws-feed.exchange.coinbase.com",
+                    on_message=self.on_message,
+                    on_open=self.on_open,
+                    on_error=self.on_error,
+                    on_close=self.on_close
+                )
         
-        # Run forever (blocking)
-        ws.run_forever()
+                # Run forever (blocking)
+                ws.run_forever(ping_interval=30, ping_timeout=10)
+
+                # if we get here, connection closed
+                if self.should_reconnect:
+                    print(f"Connection lost. Reconnecting in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, max_delay)  # exponential backoff
+                else:
+                    print("Shutting down, reconnection = False.")
+                    break
+            except KeyboardInterrupt:
+                print("KeyboardInterrupt -- shutting down...")
+                self.should_reconnect = False
+                break
+            except Exception as e:
+                print(f"Unexpected error: {e}. Reconnecting in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, max_delay)  # exponential backoff
+
+        print("Coinbase Producer stopped.")
 
 if __name__ == "__main__":
     producer = CoinbaseProducer()
