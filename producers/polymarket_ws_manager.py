@@ -8,14 +8,14 @@ from datetime import datetime, timezone
 import time
 
 consumer = KafkaConsumer('market-updates',
-                            bootstrap_servers='localhost:9092',
+                            bootstrap_servers='kafka:9093',
                             auto_offset_reset='latest',
                             enable_auto_commit=True,
                             group_id='polymarket-ws-manager',
                             value_deserializer=lambda x: json.loads(x.decode('utf-8'))
                             )
 
-producer = KafkaProducer(bootstrap_servers='localhost:9092',
+producer = KafkaProducer(bootstrap_servers='kafka:9093',
                             value_serializer=lambda x: json.dumps(x).encode('utf-8')
                             )
 
