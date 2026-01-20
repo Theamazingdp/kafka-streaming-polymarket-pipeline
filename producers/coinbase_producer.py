@@ -13,7 +13,7 @@ class CoinbaseProducer:
             bootstrap_servers=['localhost:9092'],
             value_serializer=lambda v: json.dumps(v).encode('utf-8')
         )
-        print("✅ Connected to Kafka!")
+        print("Connected to Kafka!")
         
         self.message_count = 0
         self.throttle_seconds = throttle_seconds
@@ -45,7 +45,7 @@ class CoinbaseProducer:
                     print(f"📊 Message #{self.message_count}: BTC ${self.latest_price['price']:,.2f}")
                 
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"Error: {e}")
     
     def on_open(self, ws):
         """Called when WebSocket connects"""
@@ -58,17 +58,17 @@ class CoinbaseProducer:
             "channels": ["ticker"]
         }
         ws.send(json.dumps(subscribe_message))
-        print("📡 Subscribed to BTC-USD ticker")
+        print("Subscribed to BTC-USD ticker")
     
     def on_error(self, ws, error):
-        print(f"❌ WebSocket Error: {error}")
+        print(f"WebSocket Error: {error}")
     
     def on_close(self, ws, close_status_code, close_msg):
-        print(f"🔌 WebSocket closed: {close_status_code}")
+        print(f"WebSocket closed: {close_status_code}")
     
     def start(self):
         """Start the producer"""
-        print("🚀 Starting Coinbase Producer...")
+        print("Starting Coinbase Producer...")
         
         ws = websocket.WebSocketApp(
             "wss://ws-feed.exchange.coinbase.com",
