@@ -8,13 +8,13 @@ import json
 from datetime import datetime, timedelta, timezone
 
 consumer = KafkaConsumer('market-updates', 
-                            bootstrap_servers='localhost:9092', 
+                            bootstrap_servers='kafka:9093', 
                             auto_offset_reset='earliest', 
                             enable_auto_commit=True, 
                             group_id='market-resolution-group', 
                             value_deserializer=lambda x: json.loads(x.decode('utf-8')))
 
-producer = KafkaProducer(bootstrap_servers='localhost:9092', value_serializer=lambda x: json.dumps(x).encode('utf-8'))
+producer = KafkaProducer(bootstrap_servers='kafka:9093', value_serializer=lambda x: json.dumps(x).encode('utf-8'))
 
 def resolve_market_when_ready(market_data):
     slug = market_data['slug']
