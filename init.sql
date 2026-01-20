@@ -44,6 +44,16 @@ CREATE INDEX idx_bronze_polymarket_prices_time ON bronze.polymarket_prices(inges
 CREATE INDEX idx_bronze_polymarket_prices_type ON bronze.polymarket_prices((payload->>'event_type'));
 CREATE INDEX idx_bronze_polymarket_prices_market_id ON bronze.polymarket_prices((payload->>'market_id'));
 
+-- Raw table for market resolution failures
+CREATE TABLE IF NOT EXISTS bronze.market_resolution_failures(
+    id SERIAL PRIMARY KEY,
+    ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    payload JSONB NOT NULL  
+)
+
+CREATE INDEX idx_bronze_resolution_failures_time ON bronze.market_resolution_failures(ingested_at);
+CREATE INDEX idx_bronze_resolution_failures_slug ON bronze.market_resolution_failures((payload->>'slug'));
+
 -- Verify the tables were created
 DO $$
 BEGIN
