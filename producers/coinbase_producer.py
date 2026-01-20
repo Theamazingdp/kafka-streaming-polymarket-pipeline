@@ -1,4 +1,6 @@
 # producers/coinbase_producer.py
+import signal
+import sys
 from kafka import KafkaProducer
 import websocket
 import json
@@ -20,6 +22,7 @@ class CoinbaseProducer:
         self.last_sent = 0
         self.latest_price = None
         self.should_reconnect = True
+        self.is_intentional_close = False
     
     def on_message(self, ws, message):
         """Called when WebSocket receives a message"""
@@ -69,9 +72,20 @@ class CoinbaseProducer:
         if self.should_reconnect:
             print("Will attempt to reconnect...")
     
+    def signal_handler(self, signum, frame):
+        """Handle Ctrl+C gracefully"""
+        print("\nReceived interrupt signal - shutting down gracefully...")
+        self.should_reconnect = False
+        self.is_intentional_close = True
+        sys.exit(0)
+
     def start(self):
         """Start the producer"""
         print("Starting Coinbase Producer...")
+
+        # Register signal handler for Ctrl+C
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
 
         retry_delay = 5  # seconds
         max_delay = 60 # max 1 min between retries
@@ -92,21 +106,21 @@ class CoinbaseProducer:
                 ws.run_forever(ping_interval=30, ping_timeout=10)
 
                 # if we get here, connection closed
-                if self.should_reconnect:
+                if self.should_reconnect and not self.is_intentional_close:
                     print(f"Connection lost. Reconnecting in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                     retry_delay = min(retry_delay * 2, max_delay)  # exponential backoff
                 else:
                     print("Shutting down, reconnection = False.")
                     break
-            except KeyboardInterrupt:
-                print("KeyboardInterrupt -- shutting down...")
-                self.should_reconnect = False
-                break
             except Exception as e:
-                print(f"Unexpected error: {e}. Reconnecting in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, max_delay)  # exponential backoff
+                print(f"Unexpected error: {e}")
+                if self.should_reconnect:
+                    print(f"Retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, max_delay)
+                else:
+                    break
 
         print("Coinbase Producer stopped.")
 
