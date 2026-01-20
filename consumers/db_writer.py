@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 # PostgreSQL connection parameters
 conn = psycopg2.connect(
-    host = 'localhost',
+    host = 'postgres',
     port = 5432,
     database = 'trading_data',
     user = 'postgres',
@@ -17,7 +17,7 @@ conn.autocommit = True # Autocommit each insert
 def consume_topic(topic_name, bronze_table):
     consumer = KafkaConsumer(
         topic_name,
-        bootstrap_servers='localhost:9092',
+        bootstrap_servers='kafka:9093',
         auto_offset_reset='earliest',
         enable_auto_commit=True,
         group_id=f'db-writer-{topic_name}',
