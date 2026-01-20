@@ -1,0 +1,65 @@
+services:
+  coinbase-producer:
+    build: .
+    container_name: coinbase_producer
+    command: python -u coinbase_producer.py
+    networks:
+      - trading-bot_default
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  market-discovery:
+    build: .
+    container_name: market_discovery
+    command: python -u market_discovery.py
+    networks:
+      - trading-bot_default
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  market-resolution:
+    build: .
+    container_name: market_resolution
+    command: python -u market_resolution.py
+    networks:
+      - trading-bot_default
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  polymarket-ws-manager:
+    build: .
+    container_name: polymarket_ws_manager
+    command: python -u polymarket_ws_manager.py
+    networks:
+      - trading-bot_default
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  db-writer:
+    build: .
+    container_name: db_writer
+    command: python -u db_writer.py
+    networks:
+      - trading-bot_default
+    restart: unless-stopped
+    depends_on:
+      - kafka
+      - postgres
+    environment:
+      - PYTHONUNBUFFERED=1
+
+networks:
+  trading-bot_default:
+    external: true  # Use existing network from main docker-compose
