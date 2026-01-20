@@ -19,6 +19,7 @@ class CoinbaseProducer:
         self.throttle_seconds = throttle_seconds
         self.last_sent = 0
         self.latest_price = None
+        self.should_reconnect = True
     
     def on_message(self, ws, message):
         """Called when WebSocket receives a message"""
