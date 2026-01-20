@@ -7,8 +7,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all python scripts
-COPY *.py .
+# Copy all python scripts from producers and consumers directories
+COPY producers/*.py .
+COPY consumers/*.py .
 
 # Default command (will be overridden in docker-compose)
 CMD ["python", "-u"]
