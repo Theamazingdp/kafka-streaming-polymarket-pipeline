@@ -53,7 +53,8 @@ if __name__ == "__main__":
         ('market-updates', 'bronze.market_updates'),
         ('market-resolutions', 'bronze.market_resolutions'),
         ('asset-prices', 'bronze.btc_prices'),
-        ('polymarket-prices', 'bronze.polymarket_prices')
+        ('polymarket-prices', 'bronze.polymarket_prices'),
+        ('market-resolution-failures', 'bronze.market_resolution_failures')
     ]
 
     for topic, table in topics:
