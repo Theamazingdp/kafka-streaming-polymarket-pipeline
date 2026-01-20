@@ -66,7 +66,7 @@ def consume_topic(topic_name, bronze_table):
         except Exception as e:
             error_count += 1
             print(f"Error writing message to {bronze_table}: {e}")
-            print(f"Failed message: {str(message.value[200:])}...")  # Print first 200 chars of the message
+            print(f"Failed message: {str(message.value[:200])}...")  # Print first 200 chars of the message
 
             # Dont crash - skip message and continue
             if error_count % 100 == 0:
