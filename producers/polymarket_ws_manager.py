@@ -22,9 +22,11 @@ producer = KafkaProducer(bootstrap_servers='localhost:9092',
 # state variables
 current_token_ids = []
 current_market_id = None
+current_market_end_time = None
 token_outcome_map = {}
 ws = None
 ws_thread = None
+is_intentional_close = False
 
 # WebSocket event handlers
 def on_message(ws, message):
@@ -56,7 +58,11 @@ def process_event(data):
         
 
         if bids and asks:
-            outcome = token_outcome_map[data['asset_id']]
+            outcome = token_outcome_map.get(data['asset_id'])
+            if not outcome:
+                print(f"Unknown asset_id {data['asset_id']} in book event")
+                return
+
             # Extract best bid and ask
             best_bid_price = float(bids[0]['price'])
             best_bid_size = float(bids[0]['size'])
@@ -108,11 +114,15 @@ def process_event(data):
         for change in data['price_changes']:
             # only capture buy side
             if change['side'] == 'BUY':
+                outcome = token_outcome_map.get(change['asset_id'])
+                if not outcome:
+                    print(f"Unknown asset_id {change['asset_id']} in price_change event")
+                    continue
                 event = {
                     'type': 'price_change',
                     'market_id': current_market_id,
                     'asset_id': change['asset_id'],
-                    'outcome': token_outcome_map[change['asset_id']],
+                    'outcome': outcome,
                     'side': change['side'],
                     'timestamp': datetime.now().isoformat(),
                     'price': float(change['price']),
@@ -122,17 +132,34 @@ def process_event(data):
 
     # TRADE TYPE
     elif event_type == 'last_trade_price':
+        outcome = token_outcome_map.get(data['asset_id'])
+        if not outcome:
+            print(f"Unknown asset_id {data['asset_id']} in trade event")
+            return
         event = {
             'type': 'trade',
             'market_id': current_market_id,
             'asset_id': data['asset_id'],
             'price': float(data['price']),
-            'outcome': token_outcome_map[data['asset_id']],
+            'outcome': outcome,
             'side': data['side'],
             'size': float(data['size']),
             'timestamp': datetime.now().isoformat()
         }
         producer.send('polymarket-prices', event)
+
+    # UNKNOWN TYPE - Capture for logging
+    else:
+        print(f"Unknown event type received: {event_type}")
+        event = {
+            'type': 'unknown',
+            'original_event_type': event_type,
+            'market_id': current_market_id,
+            'timestamp': datetime.now().isoformat(),
+            'raw_data': data
+        }
+        producer.send('polymarket-prices', event)
+        print(f"Published unknown event type: {event_type}")
 
 
 def parse_datetime(dt_str):
@@ -158,7 +185,53 @@ def on_error(ws, error):
     print(f"Websocket Error: {error}")
 
 def on_close(ws, close_status_code, close_msg):
-    print(f"Websocket closed: {close_status_code}")
+    global is_intentional_close
+    print(f"Websocket closed: code={close_status_code}, msg={close_msg}")
+
+    # If intentional close, do not attempt to reconnect
+    if is_intentional_close:
+        print("WebSocket closed intentionally. No Reconnection will be attempted.")
+        is_intentional_close = False
+        return
+    
+    # Check if market is still active before reconnecting
+    if current_market_end_time:
+        now = datetime.now(timezone.utc)
+        if now < current_market_end_time:
+            print("Market still active, attempting to reconnect WebSocket...")
+            reconnect_with_backoff()
+        else:
+            print("Market has ended, not reconnecting WebSocket.")
+    else:
+        print("No active market - not reconnecting WebSocket.")
+
+def reconnect_with_backoff():
+    global ws, ws_thread
+
+    retry_delay = 5  # start with 5 seconds
+    max_retry = 30  # max 30 seconds
+
+    for attempt in range(10):
+        # Check if market is still active
+        if current_market_end_time:
+            now = datetime.now(timezone.utc)
+            if now >= current_market_end_time:
+                print("Market has ended during backoff, not reconnecting WebSocket.")
+                return
+
+        print(f"Reconnection Attempt {attempt}/10 in {retry_delay} seconds...")
+        time.sleep(retry_delay)
+
+        try:
+            # Try to reconnect
+            start_websocket(current_token_ids)
+            print("Reconnected to WebSocket successfully.")
+            return
+        except Exception as e:
+            print(f"Reconnection attempt {attempt} failed: {e}")
+            retry_delay = min(retry_delay * 2, max_retry)  # exponential backoff
+    
+    print("Failed to reconnect after 10 attempts.")
 
 # Websocket Lifecycle Management
 def start_websocket(token_ids):
@@ -178,15 +251,17 @@ def start_websocket(token_ids):
     ws_thread.start()
 
 def stop_websocket():
-    global ws
+    global ws, is_intentional_close
 
     if ws:
         print("closing WebSocket connection...")
+        is_intentional_close = True
+        ws.close()
         if ws_thread:
             ws_thread.join(timeout=5)
 
 def reconnect_websocket(market_data):
-    global current_token_ids, current_market_id, token_outcome_map
+    global current_token_ids, current_market_id, token_outcome_map, current_market_end_time
 
     # Extract token IDs from market data
     new_token_ids = market_data['token_ids']
@@ -194,10 +269,12 @@ def reconnect_websocket(market_data):
     end_time = parse_datetime(market_data['end_time'])
 
     if new_token_ids != current_token_ids:
-        print(f"Token IDs changed. Reconnecting WebSocket...")
+        print(f"New market detected {market_data['question']}")
+        print(f"Market ends at {end_time.strftime('%H:%M:%S')} UTC")
         stop_websocket()
         current_token_ids = new_token_ids
         current_market_id = new_market_id
+        current_market_end_time = end_time
 
         token_outcome_map = {
             new_token_ids[0]: 'YES',
@@ -212,7 +289,7 @@ def schedule_websocket_close(end_time):
     seconds_until_end = (end_time - now).total_seconds()
 
     def close_at_end():
-        time.sleep(seconds_until_end)
+        time.sleep(max(0, seconds_until_end))
         print("Market ended. Closing WebSocket connection.")
         stop_websocket()
 
@@ -227,6 +304,4 @@ if __name__ == "__main__":
     #consume from market-uodates
     for message in consumer:
         market_data = message.value
-
-        print(f"Received market update: {market_data['question']}")
         reconnect_websocket(market_data)
