@@ -49,6 +49,16 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
 
+  user-positions-tracker:
+    build: .
+    container_name: user_positions_tracker
+    command: python -u user_positions_tracker.py
+    networks:
+      - trading-bot_default
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
 networks:
   trading-bot_default:
     external: true  # Use existing network from main docker-compose
