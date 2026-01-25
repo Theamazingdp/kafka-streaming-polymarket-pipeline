@@ -23,6 +23,8 @@ class CoinbaseProducer:
         self.latest_price = None
         self.should_reconnect = True
         self.is_intentional_close = False
+        self.disconnect_time = None
+        self.reconnect_attempts = 0
     
     def on_message(self, ws, message):
         """Called when WebSocket receives a message"""
@@ -52,8 +54,26 @@ class CoinbaseProducer:
             print(f"Error: {e}")
     
     def on_open(self, ws):
-        """Called when WebSocket connects"""
+        # Called when WebSocket connects
         print("Connected to Coinbase WebSocket!")
+        
+       # Check if this is a reconnection after disconnect
+        if self.disconnect_time:
+            downtime = int(time.time() - self.disconnect_time)
+            
+            error_event = {
+                'service_name': 'coinbase_producer',
+                'error_type': 'websocket_connection_lost',
+                'retry_attempts': self.reconnect_attempts,
+                'downtime': downtime,
+                'timestamp': datetime.now().isoformat()
+            }
+            self.producer.send('service-errors', error_event)
+            print(f"Published error event: {self.reconnect_attempts} attempts, {downtime}s downtime")
+            
+            # Reset tracking
+            self.disconnect_time = None
+            self.reconnect_attempts = 0
         
         # Subscribe to BTC-USD ticker
         subscribe_message = {
@@ -68,9 +88,11 @@ class CoinbaseProducer:
         print(f"WebSocket Error: {error}")
     
     def on_close(self, ws, close_status_code, close_msg):
-        print(f"WebSocket closed: {close_status_code}")
-        if self.should_reconnect:
-            print("Will attempt to reconnect...")
+        if not self.is_intentional_close:
+            print(f"WebSocket closed unexpectedly: {close_status_code}")
+            self.disconnect_time = time.time()  # Record disconnect time
+        else:
+            print(f"WebSocket closed intentionally: {close_status_code}")
     
     def signal_handler(self, signum, frame):
         """Handle Ctrl+C gracefully"""
@@ -88,7 +110,7 @@ class CoinbaseProducer:
         signal.signal(signal.SIGTERM, self.signal_handler)
 
         retry_delay = 5  # seconds
-        max_delay = 60 # max 1 min between retries
+        max_delay = 30 # max 30 sec between retries
 
         while self.should_reconnect:
             try:
@@ -107,6 +129,7 @@ class CoinbaseProducer:
 
                 # if we get here, connection closed
                 if self.should_reconnect and not self.is_intentional_close:
+                    self.reconnect_attempts += 1
                     print(f"Connection lost. Reconnecting in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                     retry_delay = min(retry_delay * 2, max_delay)  # exponential backoff
