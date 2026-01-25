@@ -124,7 +124,7 @@ if __name__ == "__main__":
         ('market-resolutions', 'bronze.market_resolutions'),
         ('asset-prices', 'bronze.btc_prices'),
         ('polymarket-prices', 'bronze.polymarket_prices'),
-        ('market-resolution-failures', 'bronze.market_resolution_failures')
+        ('market-resolution-failures', 'bronze.market_resolution_failures'),
         ('user-positions', 'bronze.user_positions'),
         ('service-errors', 'bronze.service_errors')
     ]
