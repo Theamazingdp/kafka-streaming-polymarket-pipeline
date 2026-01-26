@@ -1,15 +1,50 @@
-Welcome to your new dbt project!
+# Polymarket Analytics - dbt Transformations
 
-### Using the starter project
+Data transformation layer for the Polymarket real-time trading data pipeline.
 
-Try running the following commands:
-- dbt run
-- dbt test
+## Purpose
 
+Transforms raw event data (Bronze) into clean, typed tables (Silver) and ML-ready features (Gold) using the medallion architecture.
 
-### Resources:
-- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
-- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
-- Join the [chat](https://community.getdbt.com/) on Slack for live discussions and support
-- Find [dbt events](https://events.getdbt.com) near you
-- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
+## Architecture
+```
+Bronze (Raw JSONB from Kafka)
+  ↓
+Silver (Cleaned, typed tables)
+  ↓
+Gold (ML features for model training)
+```
+
+## Current Models
+
+### Silver Layer
+- `markets` - Cleaned market metadata with typed columns
+
+### Gold Layer
+- Coming soon: ML feature engineering
+
+## Running Transformations
+```bash
+# Run all models
+dbt run
+
+# Run specific model
+dbt run --select markets
+
+# Test data quality
+dbt test
+```
+
+## Connection
+
+Connects to PostgreSQL database: `trading_data`
+- Bronze source: `bronze.*` schema
+- Silver output: `analytics_silver.*` schema  
+- Gold output: `analytics_gold.*` schema
+
+## Development
+
+Models are organized by layer:
+- `models/bronze/` - Source definitions (read-only)
+- `models/silver/` - Cleaned transformations
+- `models/gold/` - Feature engineering
