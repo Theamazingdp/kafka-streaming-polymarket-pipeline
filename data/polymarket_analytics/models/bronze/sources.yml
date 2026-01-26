@@ -1,0 +1,28 @@
+sources:
+  - name: bronze
+    description: "Raw data from Kafka producers"
+    database: trading_data
+    schema: bronze
+    tables:
+      - name: market_updates
+        description: Market metadata from Polymarket API
+
+      - name: market_resolutions
+        description: Final market outcomes
+
+      - name: market_resolution_failures
+        description: Failed market resolution attempts
+
+      - name: btc_prices
+        description: BTC prices from Coinbase websocket
+
+      - name: polymarket_prices
+        description: Orderbook events from Polymarket
+      
+      - name: user_positions
+        description: Wallet positions from Goldsky subgraph
+
+      - name: service_errors
+        description: Service error logs from various microservices
+
+      
